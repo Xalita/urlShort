@@ -1,12 +1,12 @@
 const express = require ('express');
 const dns = require ('dns');
 const bodyParser = require ('body-parser');
+const urlParser = require ('url')
 const app = express();
 const cors = require('cors');
-const validUrl = require('valid-url');
-const mongo= require ('mongodb')
 const moongoose = require ('mongoose');
 const { reset } = require('nodemon');
+const { Db } = require('mongodb');
 const DB = process.env.DB
 // Basic Configuration
 moongoose.connect('mongodb+srv://bruno:sarapita88@cluster0.5jn5b.mongodb.net/freeCode?retryWrites=true&w=majority', {
@@ -45,112 +45,82 @@ let urlCode = 0;
 app.post ('/api/shorturl', async (req,res,next)=> {
 
     let {url} = req.body;
-    
-
-   if (!validUrl.isWebUri(url)) {
-       return res.status(401).json ({
-        error: 'invalid URL'
-       })
-   } else {
-       try {
-           let findOne = await URL.findOne({
-               original_url: url
-           });
-
-            //vê se existe na db
-           if (findOne) {
-                res.json ({
-                    original_url: findOne.original_url,
-                    short_url: findOne.short_url
-               })
-           } else {
-                urlCode++;
-                findOne = new URL( {
-                    original_url: url,
-                    short_url:urlCode
+    console.log (typeof URL);
+    const lookup = dns.lookup(urlParser.parse(url).hostname,async (err,address) => {
+        if (!address) {
+            res.json({
+                error: 'invalid URL'
+            })
+        } else {
+            try {
+                let findOne = await URL.findOne( {
+                    original_url: url
                 });
 
-                await findOne.save();
-                res.json({
-                    original_url: findOne.original_url,
-                    short_url: findOne.short_url
-                })
 
-           }
-       }
-       catch(err) {
-           console.log (err);
-           res.status(500).json('server error')
-       }
-   }
+                if (findOne) {
+                    res.json({
+                        original_url: findOne.original_url,
+                        short_url: findOne.short_url
+                    })
+                } else {
+
+                   
+                    // let lastShortNumber = URL.findOne(data => data.short_url);
+                    // console.log ('LastShortNumber: ',lastShortNumber);
+                    findOne = new URL ( {
+                        original_url: url,
+                        short_url: `${urlCode}`
+                    });
+
+                    findOne.save();
+                    res.json({
+                        original_url: url,
+                        short_url: findOne.short_url
+                    })
+
+                }
+                 
+            }
+            catch(e) {
+                console.log ('error: ', e)
+            }
+        }
+    })
+    
+
+   console.log ('lookup: ',lookup)
    
 
-    // console.log (valid);
-    // const test = dns.lookup(newURL,(err)=>{
-    //     if (err) {
-    //         return res.json({
-    //             error: 'invalid URL'
-    //         })
-    //     }
-    // })
-    // console.log (test.hostname);
-
-        // if (!newURL) {
-        //     return res.json({
-        //         error: 'invalid URL'
-        //     })
-        // } else {
-        //     counter++;
-        //     const newObj = {
-        //         original_url: URL.original_url,
-        //         shortUrl:`${counter}`
-        //     }
-        //     list.push (newObj)
-        //     console.log (list)
-        //     return res.json(newObj);
-        // }
-
-    // if (newURL === '') {
-    //     return res.json({
-    //         error: 'invalid url'
-    //     })
-    // } else {
-    //     counter++;
-
-    //     const newOb = {
-    //         original_url: url,
-    //         short_url: `${counter}`
-    //     }
-    //     list.push(newOb);
-    //     console.log (list)
-    //     return res.json(newOb)
-    // }
 
 })
 
 
 app.get ('/api/shorturl/:id', async (req,res) => {
+
     const {id} = req.params;
 
     try {
 
-        const findShort = await URL.findOne ({
+        let findShort = await URL.findOne({
             short_url: id
         })
 
+        console.log (findShort.original_url);
+        console.log (id)
+
         if (findShort) {
             res.redirect(findShort.original_url);
+
         } else {
-            console.log ( findShort);
-            res.status(404).json('No URL found');
+            res.status(404).json('Not Found')
+
         }
 
-    } catch (e) {
-        console.log (e)
-        res.status(500).json('Server Error')
     }
-
-
+    catch (e) {
+        console.log ('error: ', e)
+    }
 
 
 })
